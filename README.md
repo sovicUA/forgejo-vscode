@@ -20,7 +20,7 @@
 ## Встановлення
 
 1. Extensions (Cmd/Ctrl+Shift+X) → меню `…` → **Install from VSIX…** → `forgejo-connector-<версія>.vsix`.
-   Або з термінала: `code --install-extension forgejo-connector-0.3.1.vsix`.
+   Або з термінала: `code --install-extension forgejo-connector-0.3.2.vsix`.
 2. Command Palette (Cmd/Ctrl+Shift+P) → **Forgejo: Увійти**:
    - адреса сервера, наприклад `https://git.example.ua` (зберігається в налаштуванні `forgejo.url`);
    - токен доступу (див. нижче «Токен доступу»).

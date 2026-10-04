@@ -40,7 +40,9 @@
   (гілка з `git.defaultBranchName`) → `commit('Initial commit', {all: true})` → `connectAndPush`.
 - Помилки git: `GitError.message` загальний («Failed to execute git») — `errorMessage()` додає рядки fatal/error зі `stderr`.
 - Самооновлення: `checkForUpdates` — `GET /repos/{forgejo.updates.repository}/releases/latest`, `.vsix` з
-  `browser_download_url` (web-маршрут → Basic логін:токен, не `Authorization: token`), `workbench.extensions.installExtension`,
+  `browser_download_url` (web-маршрут → Basic логін:токен, не `Authorization: token`) → файл у `os.tmpdir()` →
+  `workbench.extensions.installExtension` з `Uri.file` (**лише file:** — `globalStorageUri` у VS Code 1.140 має схему
+  `vscode-userdata:`, і встановлення падає з «No Servers»; на цьому спіткнулась 0.3.0),
   потім пропозиція `reloadWindow`. Авто — через 15 с і кожні 6 год, тихо (`getClient(false)`); «Пропустити» → globalState.
 - Створення: `POST /user/repos` або `/orgs/{org}/repos` (`name`, `description`, `private`, `auto_init`, `readme`).
 
@@ -53,7 +55,8 @@
   На Mac у git `credential.helper osxkeychain` — git може зберегти наш токен у Keychain (після «Вийти» він там лишається).
 - Ще не перевірено: «Forgejo: Створити репозиторій», Publish Branch для наявного репозиторію, push через HTTPS, Windows.
 - 0.3.0: перший реліз через CI пройшов (2026-10-04: тег → завдання 55, Checkout/Test/Release ✅, `.vsix` у релізі;
-  `forgejo.token` вистачає для створення релізу). Самооновлення в UI перевіряється релізом 0.3.1 (без змін коду).
+  `forgejo.token` вистачає для створення релізу). 0.3.0→0.3.1 через UI не встановилось («No Servers», див. вище; помилку ще й ховав автоматичний режим) — виправлено
+  в 0.3.2 (встановлюється вручну); перевірка самооновлення — наступним релізом.
 - Раннер `forgejo-vscode-ci` розгорнуто й зареєстровано (2026-10-04, `engine.ac.lan-forgejo-vscode`, runner v13.2.0);
   образ ci-docker перезібрано з python3/nodejs (xInfra `aeba682`). Серверні кроки виконує користувач — агенту запис
   на сервер (`ssh engine` зі змінами) і читання `.env` заборонені правилами дозволів; оболонка сервера — zsh.

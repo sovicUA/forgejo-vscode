@@ -4,6 +4,8 @@ const vscode = require('vscode');
 const http = require('http');
 const https = require('https');
 const path = require('path');
+const os = require('os');
+const fs = require('fs');
 const { execFile } = require('child_process');
 
 const SECRET_PREFIX = 'forgejo.token:';
@@ -899,18 +901,27 @@ class Forgejo {
       this.updatePromptOpen = false;
     }
 
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Forgejo Connector: встановлення версії ${version}…` },
-      async () => {
-        const data = await client.download(asset.browser_download_url);
-        const dir = this.context.globalStorageUri;
-        await vscode.workspace.fs.createDirectory(dir);
-        const file = vscode.Uri.joinPath(dir, asset.name);
-        await vscode.workspace.fs.writeFile(file, data);
-        await vscode.commands.executeCommand('workbench.extensions.installExtension', file);
-        await vscode.workspace.fs.delete(file).then(undefined, () => undefined);
-      }
-    );
+    // Користувач погодився — помилки далі показуємо завжди, навіть якщо перевірку запустив таймер
+    try {
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Forgejo Connector: встановлення версії ${version}…` },
+        async () => {
+          const data = await client.download(asset.browser_download_url);
+          // Лише file: — для інших схем (globalStorageUri у новому VS Code — vscode-userdata:) встановлення
+          // з VSIX падає з «No Servers»
+          const file = path.join(os.tmpdir(), `forgejo-connector-update-${process.pid}-${asset.name}`);
+          await fs.promises.writeFile(file, data);
+          try {
+            await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(file));
+          } finally {
+            await fs.promises.unlink(file).catch(() => undefined);
+          }
+        }
+      );
+    } catch (err) {
+      vscode.window.showErrorMessage(`Forgejo Connector: не вдалося встановити версію ${version}: ${errorMessage(err)}`);
+      return;
+    }
     const reload = 'Перезавантажити вікно';
     if (await vscode.window.showInformationMessage(
       `Forgejo Connector ${version} встановлено. Перезавантажте вікно, щоб застосувати оновлення.`, reload
