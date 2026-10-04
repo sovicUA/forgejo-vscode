@@ -1,0 +1,107 @@
+{
+  "name": "forgejo-connector",
+  "displayName": "Forgejo Connector",
+  "description": "Клонування, створення та публікація репозиторіїв Forgejo / Gitea прямо з VS Code",
+  "version": "0.2.2",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers"
+  ],
+  "keywords": [
+    "forgejo",
+    "gitea",
+    "git",
+    "clone"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "forgejo.signIn",
+        "title": "Увійти",
+        "category": "Forgejo"
+      },
+      {
+        "command": "forgejo.signOut",
+        "title": "Вийти",
+        "category": "Forgejo"
+      },
+      {
+        "command": "forgejo.clone",
+        "title": "Клонувати репозиторій",
+        "category": "Forgejo"
+      },
+      {
+        "command": "forgejo.createRepository",
+        "title": "Створити репозиторій",
+        "category": "Forgejo"
+      },
+      {
+        "command": "forgejo.publish",
+        "title": "Опублікувати у Forgejo",
+        "category": "Forgejo",
+        "icon": "$(cloud-upload)"
+      }
+    ],
+    "configuration": {
+      "title": "Forgejo",
+      "properties": {
+        "forgejo.url": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Адреса сервера Forgejo, наприклад `https://git.example.ua`."
+        },
+        "forgejo.cloneProtocol": {
+          "type": "string",
+          "enum": [
+            "ssh",
+            "https",
+            "ask"
+          ],
+          "enumDescriptions": [
+            "Клонувати та підключати через SSH (потрібен SSH-ключ, доданий у Forgejo)",
+            "Клонувати та підключати через HTTPS (автентифікація токеном розширення)",
+            "Щоразу питати"
+          ],
+          "default": "ssh",
+          "description": "Протокол для клонування та підключення нових репозиторіїв."
+        },
+        "forgejo.defaultPrivate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Нові репозиторії за замовчуванням приватні."
+        }
+      }
+    },
+    "viewsWelcome": [
+      {
+        "view": "scm",
+        "contents": "Цю папку можна опублікувати в Forgejo: буде створено репозиторій на сервері, зроблено перший коміт і відправлено код.\n[$(cloud-upload) Publish to Forgejo](command:forgejo.publish)",
+        "when": "config.git.enabled && git.state == initialized && git.parentRepositoryCount == 0 && git.unsafeRepositoryCount == 0 && git.closedRepositoryCount == 0 && workbenchState == folder"
+      },
+      {
+        "view": "scm",
+        "contents": "Папку робочої області можна опублікувати в Forgejo: буде створено репозиторій на сервері, зроблено перший коміт і відправлено код.\n[$(cloud-upload) Publish to Forgejo](command:forgejo.publish)",
+        "when": "config.git.enabled && git.state == initialized && git.parentRepositoryCount == 0 && git.unsafeRepositoryCount == 0 && git.closedRepositoryCount == 0 && workbenchState == workspace && workspaceFolderCount != 0"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "forgejo.publish",
+          "when": "config.git.enabled && workspaceFolderCount != 0"
+        }
+      ]
+    }
+  }
+}
