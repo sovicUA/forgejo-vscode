@@ -7,7 +7,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent
-FILES = ["package.json", "extension.js", "README.md"]
+FILES = ["package.json", "extension.js", "README.md", "icon.png", "media/forgejo.ttf"]
 
 CONTENT_TYPES = """<?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -15,6 +15,8 @@ CONTENT_TYPES = """<?xml version="1.0" encoding="utf-8"?>
   <Default Extension=".js" ContentType="application/javascript"/>
   <Default Extension=".md" ContentType="text/markdown"/>
   <Default Extension=".vsixmanifest" ContentType="text/xml"/>
+  <Default Extension=".png" ContentType="image/png"/>
+  <Default Extension=".ttf" ContentType="font/ttf"/>
 </Types>
 """
 
@@ -30,6 +32,7 @@ def manifest(pkg):
     <Tags>{escape(','.join(pkg.get('keywords', [])))}</Tags>
     <Categories>{escape(','.join(pkg.get('categories', [])))}</Categories>
     <GalleryFlags>Public</GalleryFlags>
+    <Icon>extension/{escape(pkg['icon'])}</Icon>
     <Properties>
       <Property Id="Microsoft.VisualStudio.Code.Engine" Value="{escape(pkg['engines']['vscode'])}"/>
       <Property Id="Microsoft.VisualStudio.Code.ExtensionDependencies" Value="{escape(deps)}"/>
@@ -44,6 +47,7 @@ def manifest(pkg):
   <Assets>
     <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/>
     <Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true"/>
+    <Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="extension/{escape(pkg['icon'])}" Addressable="true"/>
   </Assets>
 </PackageManifest>
 """

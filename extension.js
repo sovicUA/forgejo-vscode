@@ -1015,7 +1015,7 @@ async function activate(context) {
     context.subscriptions.push(
       git.registerRemoteSourceProvider({
         name: 'Forgejo',
-        icon: 'repo',
+        icon: 'forgejo-logo', // contributes.icons, шрифт media/forgejo.ttf
         supportsQuery: true,
         placeholder: 'Назва репозиторію (введіть для пошуку)',
         getRemoteSources: query => forgejo.getRemoteSources(query),

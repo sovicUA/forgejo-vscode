@@ -20,7 +20,7 @@
 ## Встановлення
 
 1. Extensions (Cmd/Ctrl+Shift+X) → меню `…` → **Install from VSIX…** → `forgejo-connector-<версія>.vsix`.
-   Або з термінала: `code --install-extension forgejo-connector-0.3.3.vsix`.
+   Або з термінала: `code --install-extension forgejo-connector-0.4.0.vsix`.
 2. Command Palette (Cmd/Ctrl+Shift+P) → **Forgejo: Увійти**:
    - адреса сервера, наприклад `https://git.example.ua` (зберігається в налаштуванні `forgejo.url`);
    - токен доступу (див. нижче «Токен доступу»).
@@ -90,3 +90,10 @@ Node.js не потрібен — розширення на чистому JavaS
 ```
 python3 build_vsix.py
 ```
+
+## Іконки
+
+Іконка розширення (`icon.png`) і значок на кнопці «Publish to Forgejo» (шрифт `media/forgejo.ttf`, іконка
+`$(forgejo-logo)`) — логотип [Forgejo](https://forgejo.org) (автор Caesar Schinas, ліцензія
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)). Обидва файли генерує `python3 tools/make_icons.py`
+(лише стандартна бібліотека Python).

@@ -12,6 +12,9 @@
   тести → `.vsix` → реліз Forgejo; опис — повідомлення анотованого тега. Checkout і сертифікати — як у xBot.
 - `deploy/runner/` — стек раннера `forgejo-vscode-ci` (організація xDevOps, без Docker хоста в завданнях);
   розгортання й реєстрація — `docs/release.md`. Образ завдань — спільний `ci-docker` з xInfra (python3 + nodejs).
+- `tools/make_icons.py` — генерує `icon.png` (256×256, іконка розширення) і `media/forgejo.ttf` (шрифт з гліфом U+E001
+  для `contributes.icons` → `$(forgejo-logo)`: кнопка Publish to Forgejo, провайдер у Git: Clone) з геометрії логотипа
+  Forgejo, чистий Python (растеризатор і запис TTF вручну). TTF перевірено OTS (як у Chromium) і fontTools.
 - `build_vsix.py` — пакує `forgejo-connector-<версія>.vsix` без Node/vsce: `python3 build_vsix.py`.
 - `test/` — тести API-клієнта проти фейкового HTTP-сервера Forgejo, мок модуля `vscode`: `sh test/run.sh`
   (якщо `node` немає, використовується Node, вбудований у VS Code через `ELECTRON_RUN_AS_NODE=1`).

@@ -2,9 +2,10 @@
   "name": "forgejo-connector",
   "displayName": "Forgejo Connector",
   "description": "Клонування, створення та публікація репозиторіїв Forgejo / Gitea прямо з VS Code",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "publisher": "local",
   "license": "MIT",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -50,7 +51,7 @@
         "command": "forgejo.publish",
         "title": "Опублікувати у Forgejo",
         "category": "Forgejo",
-        "icon": "$(cloud-upload)"
+        "icon": "$(forgejo-logo)"
       },
       {
         "command": "forgejo.checkForUpdates",
@@ -101,12 +102,12 @@
     "viewsWelcome": [
       {
         "view": "scm",
-        "contents": "Цю папку можна опублікувати в Forgejo: буде створено репозиторій на сервері, зроблено перший коміт і відправлено код.\n[$(cloud-upload) Publish to Forgejo](command:forgejo.publish)",
+        "contents": "Цю папку можна опублікувати в Forgejo: буде створено репозиторій на сервері, зроблено перший коміт і відправлено код.\n[$(forgejo-logo) Publish to Forgejo](command:forgejo.publish)",
         "when": "config.git.enabled && git.state == initialized && git.parentRepositoryCount == 0 && git.unsafeRepositoryCount == 0 && git.closedRepositoryCount == 0 && workbenchState == folder"
       },
       {
         "view": "scm",
-        "contents": "Папку робочої області можна опублікувати в Forgejo: буде створено репозиторій на сервері, зроблено перший коміт і відправлено код.\n[$(cloud-upload) Publish to Forgejo](command:forgejo.publish)",
+        "contents": "Папку робочої області можна опублікувати в Forgejo: буде створено репозиторій на сервері, зроблено перший коміт і відправлено код.\n[$(forgejo-logo) Publish to Forgejo](command:forgejo.publish)",
         "when": "config.git.enabled && git.state == initialized && git.parentRepositoryCount == 0 && git.unsafeRepositoryCount == 0 && git.closedRepositoryCount == 0 && workbenchState == workspace && workspaceFolderCount != 0"
       }
     ],
@@ -117,6 +118,15 @@
           "when": "config.git.enabled && workspaceFolderCount != 0"
         }
       ]
+    },
+    "icons": {
+      "forgejo-logo": {
+        "description": "Логотип Forgejo",
+        "default": {
+          "fontPath": "./media/forgejo.ttf",
+          "fontCharacter": "\\E001"
+        }
+      }
     }
   }
 }
