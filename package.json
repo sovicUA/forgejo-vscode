@@ -2,7 +2,7 @@
   "name": "forgejo-connector",
   "displayName": "Forgejo Connector",
   "description": "Клонування, створення та публікація репозиторіїв Forgejo / Gitea прямо з VS Code",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "local",
   "license": "MIT",
   "engines": {
