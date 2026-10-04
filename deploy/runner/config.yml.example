@@ -1,0 +1,31 @@
+# Forgejo runner (forgejo-runner 13) for forgejo-vscode. Job image: the shared CI image from the xInfra repository
+# (services/ci-image, git.<domain>/xdevops/ci-docker), built on this host - see runner.labels below.
+# Template: on the server config.yml is generated from it with the domain, e.g.
+#   sed -e "s#<domain>#<real domain>#g" config.yml.example > config.yml
+log:
+  level: info
+  job_level: info
+runner:
+  file: /data/.runner
+  capacity: 1
+  timeout: 30m
+  shutdown_timeout: 10m
+  insecure: false
+  fetch_timeout: 30s
+  fetch_interval: 5s
+  # Overrides the labels given at registration (.runner): label "forgejo-vscode-ci" -> shared CI image
+  labels:
+    - forgejo-vscode-ci:docker://git.<domain>/xdevops/ci-docker:latest
+cache:
+  enabled: false
+container:
+  network: ""
+  privileged: false
+  # Jobs get the host CA bundle (internal CA) only
+  options: -v /etc/ssl/certs:/etc/ssl/certs:ro
+  valid_volumes:
+    - /etc/ssl/certs
+  # The release job needs no Docker: the host's Docker socket is NOT mounted into jobs (unlike xBot / xFleet)
+  docker_host: "-"
+  # Use the local copy of the CI image: pulling it would need a registry login (REQUIRE_SIGNIN_VIEW)
+  force_pull: false

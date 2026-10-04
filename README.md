@@ -20,7 +20,7 @@
 ## Встановлення
 
 1. Extensions (Cmd/Ctrl+Shift+X) → меню `…` → **Install from VSIX…** → `forgejo-connector-<версія>.vsix`.
-   Або з термінала: `code --install-extension forgejo-connector-0.2.2.vsix`.
+   Або з термінала: `code --install-extension forgejo-connector-0.3.0.vsix`.
 2. Command Palette (Cmd/Ctrl+Shift+P) → **Forgejo: Увійти**:
    - адреса сервера, наприклад `https://git.example.ua` (зберігається в налаштуванні `forgejo.url`);
    - токен доступу (див. нижче «Токен доступу»).
@@ -46,6 +46,25 @@
 
 Для SSH потрібен SSH-ключ, доданий у Forgejo (Налаштування → SSH / GPG ключі).
 
+## Оновлення
+
+Розширення саме перевіряє останній реліз репозиторію `forgejo.updates.repository` (за замовчуванням
+`xDevOps/forgejo-vscode`) — через 15 с після запуску VS Code і далі кожні 6 годин — і, якщо є новіша версія,
+пропонує: **Оновити** (завантажує `.vsix` вашим токеном, встановлює й пропонує перезавантажити вікно),
+**Що нового** або **Пропустити цю версію**. Перевірити вручну — **Forgejo: Перевірити оновлення розширення**;
+вимкнути — `forgejo.updates.check`. Без входу у Forgejo перевірка мовчки пропускається.
+
+### Випуск нової версії
+
+1. Підняти `version` у `package.json`, закомітити.
+2. Анотований тег — його повідомлення стане описом релізу й текстом «Що нового»:
+   ```
+   git tag -a v0.3.1 -m "Що змінилося"
+   git push --follow-tags
+   ```
+3. Forgejo Actions (`.forgejo/workflows/release.yml`, раннер з міткою `forgejo-vscode-ci`, `deploy/runner`, [docs/release.md](docs/release.md)) проганяє тести, збирає `.vsix`
+   і створює реліз (`release.py`). Тег має збігатися з версією в `package.json`, інакше реліз не створюється.
+
 ## Сервер із внутрішнім сертифікатом
 
 VS Code використовує системне сховище сертифікатів (налаштування `http.systemCertificates`, увімкнене за замовчуванням).
@@ -61,6 +80,8 @@ VS Code використовує системне сховище сертифі�
 | `forgejo.url` | — | Адреса сервера Forgejo |
 | `forgejo.cloneProtocol` | `ssh` | `ssh`, `https` або `ask` (питати щоразу) |
 | `forgejo.defaultPrivate` | `true` | Нові репозиторії за замовчуванням приватні |
+| `forgejo.updates.check` | `true` | Перевіряти нові версії розширення й пропонувати оновитися |
+| `forgejo.updates.repository` | `xDevOps/forgejo-vscode` | Репозиторій, з релізів якого береться оновлення |
 
 ## Збірка
 

@@ -1,0 +1,24 @@
+# Forgejo Actions runner for forgejo-vscode (organization xDevOps, label "forgejo-vscode-ci"): runs the release job
+# as a container on this host's Docker. Same layout as xBot / xFleet deploy/runner.
+# On the server: ~/containers/forgejo-vscode-ci.<domain>, next to it (not committed): .env (DOCKER_GID), config.yml
+# (from config.yml.example). Setup and registration: docs/release.md.
+name: forgejo-vscode-ci
+
+services:
+  runner:
+    image: code.forgejo.org/forgejo/runner:13
+    user: "1000:${DOCKER_GID:?}"
+    command: forgejo-runner daemon --config /config/config.yml
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - ./config.yml:/config/config.yml:ro
+      - runner-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The host's CA bundle (with the internal root CA) to reach https://git.<domain>
+      - /etc/ssl/certs:/etc/ssl/certs:ro
+    working_dir: /data
+    restart: unless-stopped
+
+volumes:
+  runner-data:

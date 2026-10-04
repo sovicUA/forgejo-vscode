@@ -2,7 +2,7 @@
   "name": "forgejo-connector",
   "displayName": "Forgejo Connector",
   "description": "Клонування, створення та публікація репозиторіїв Forgejo / Gitea прямо з VS Code",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -51,6 +51,11 @@
         "title": "Опублікувати у Forgejo",
         "category": "Forgejo",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "forgejo.checkForUpdates",
+        "title": "Перевірити оновлення розширення",
+        "category": "Forgejo"
       }
     ],
     "configuration": {
@@ -80,6 +85,16 @@
           "type": "boolean",
           "default": true,
           "description": "Нові репозиторії за замовчуванням приватні."
+        },
+        "forgejo.updates.check": {
+          "type": "boolean",
+          "default": true,
+          "description": "Перевіряти нові версії розширення в релізах Forgejo (під час запуску й кожні 6 годин) і пропонувати оновитися."
+        },
+        "forgejo.updates.repository": {
+          "type": "string",
+          "default": "xDevOps/forgejo-vscode",
+          "markdownDescription": "Репозиторій на сервері `forgejo.url`, з релізів якого береться `.vsix` для оновлення (`власник/назва`)."
         }
       }
     },

@@ -1,0 +1,36 @@
+# Реліз розширення: push тега v<версія> → тести → forgejo-connector-<версія>.vsix у релізі Forgejo.
+# Розширення в користувачів саме перевіряє останній реліз цього репозиторію й пропонує оновитися.
+#   Випуск: підняти version у package.json, закомітити, потім
+#     git tag -a v0.3.0 -m "Що нового (піде в опис релізу й у підказку про оновлення)"
+#     git push --follow-tags
+# Раннер: мітка "forgejo-vscode-ci" — deploy/runner (налаштування й реєстрація — docs/release.md);
+# образ завдань — спільний ci-docker (xInfra, з python3 і nodejs), /etc/ssl/certs хоста змонтовано.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: forgejo-vscode-ci
+    steps:
+      - name: Checkout
+        run: |
+          git init -q .
+          # Тег — разом з об'єктом анотованого тега (його повідомлення — опис релізу)
+          git -c http.extraHeader="Authorization: token ${{ forgejo.token }}" \
+            fetch -q --depth 1 "${{ forgejo.server_url }}/${{ forgejo.repository }}.git" \
+            "+${{ forgejo.ref }}:${{ forgejo.ref }}"
+          git checkout -q "${{ forgejo.ref_name }}"
+      - name: Test
+        run: sh test/run.sh
+      - name: Release
+        run: python3 release.py "${{ forgejo.ref_name }}"
+        env:
+          FORGEJO_URL: ${{ forgejo.server_url }}
+          FORGEJO_REPO: ${{ forgejo.repository }}
+          FORGEJO_TOKEN: ${{ forgejo.token }}
+          # Набір сертифікатів хоста (з внутрішнім кореневим), який раннер монтує в завдання
+          SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt

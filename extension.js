@@ -11,6 +11,9 @@ const PAGE_SIZE = 50;
 const MAX_PAGES = 40;
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 20000;
+const SKIPPED_VERSION_KEY = 'forgejo.skippedVersion';
+const UPDATE_FIRST_CHECK_MS = 15 * 1000;
+const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const CERT_ERRORS = new Set([
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
@@ -190,6 +193,49 @@ class ForgejoClient {
     return (res && res.data) || [];
   }
 
+  // Останній опублікований реліз (без чернеток і пре-релізів); undefined, якщо релізів немає
+  getLatestRelease(fullName) {
+    const [owner, name] = fullName.split('/');
+    return this.request('GET', `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/releases/latest`)
+      .catch(err => {
+        if (err.status === 404) {
+          return undefined;
+        }
+        throw err;
+      });
+  }
+
+  // Файл релізу (/releases/download/…) — не API, тож Basic-автентифікація логін + токен, як у git.
+  // Переадресація на інший хост — без автентифікації.
+  download(fileUrl, redirects = 5) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(fileUrl);
+      const headers = {};
+      if (url.origin === new URL(this.baseUrl).origin) {
+        headers.Authorization = 'Basic ' + Buffer.from(`${this.user.login}:${this.token}`).toString('base64');
+      }
+      const lib = url.protocol === 'http:' ? http : https;
+      const req = lib.get(url, { headers, timeout: REQUEST_TIMEOUT_MS * 3 }, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
+          res.resume();
+          resolve(this.download(new URL(res.headers.location, url).toString(), redirects - 1));
+          return;
+        }
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(Buffer.concat(chunks));
+          } else {
+            reject(new ForgejoError(describeHttpError(res.statusCode), res.statusCode));
+          }
+        });
+      });
+      req.on('timeout', () => req.destroy(Object.assign(new Error('Сервер не відповідає (таймаут)'), { code: 'ETIMEDOUT' })));
+      req.on('error', err => reject(new ForgejoError(describeNetworkError(err))));
+    });
+  }
+
   getRepo(owner, name) {
     return this.request('GET', `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`);
   }
@@ -198,6 +244,18 @@ class ForgejoClient {
     const apiPath = org ? `/orgs/${encodeURIComponent(org)}/repos` : '/user/repos';
     return this.request('POST', apiPath, body);
   }
+}
+
+// Порівняння версій вигляду 1.2.3 (необов'язковий префікс «v»): > 0, якщо a новіша за b
+function compareVersions(a, b) {
+  const parse = v => String(v).replace(/^v/i, '').split(/[.+-]/).slice(0, 3).map(n => parseInt(n, 10) || 0);
+  const [pa, pb] = [parse(a), parse(b)];
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) {
+      return (pa[i] || 0) - (pb[i] || 0);
+    }
+  }
+  return 0;
 }
 
 function repoIcon(repo) {
@@ -245,6 +303,7 @@ class Forgejo {
     this.git = git;
     this.client = undefined;
     this.repoCache = undefined;
+    this.updatePromptOpen = false;
   }
 
   get baseUrl() {
@@ -779,6 +838,87 @@ class Forgejo {
     await this.publishFolder(existing ? existing.rootUri : folder.uri, existing || undefined);
   }
 
+  // --- Оновлення розширення з релізів Forgejo (forgejo.updates.repository) ---
+
+  // interactive = true: команда «Перевірити оновлення» — з діалогами входу й повідомленням «остання версія»
+  async checkForUpdates(interactive) {
+    const repoName = (config().get('updates.repository') || '').trim();
+    if (!repoName || (!interactive && !config().get('updates.check'))) {
+      if (interactive) {
+        vscode.window.showWarningMessage('Forgejo: не вказано репозиторій оновлень (налаштування forgejo.updates.repository).');
+      }
+      return;
+    }
+    const client = await this.getClient(interactive);
+    if (!client) {
+      return;
+    }
+    const current = this.context.extension.packageJSON.version;
+    const release = await client.getLatestRelease(repoName);
+    const asset = release && (release.assets || []).find(a => /\.vsix$/i.test(a.name));
+    if (!release || !asset || compareVersions(release.tag_name, current) <= 0) {
+      if (interactive) {
+        vscode.window.showInformationMessage(`Forgejo: у вас остання версія розширення (${current}).`);
+      }
+      return;
+    }
+    const version = release.tag_name.replace(/^v/i, '');
+    if (!interactive && this.context.globalState.get(SKIPPED_VERSION_KEY) === version) {
+      return;
+    }
+    if (this.updatePromptOpen) {
+      return;
+    }
+
+    this.updatePromptOpen = true;
+    let choice;
+    try {
+      const update = 'Оновити';
+      const notes = 'Що нового';
+      const skip = 'Пропустити цю версію';
+      do {
+        choice = await vscode.window.showInformationMessage(
+          `Forgejo Connector: доступна версія ${version} (у вас ${current}).`,
+          update, notes, skip
+        );
+        if (choice === notes) {
+          await vscode.window.showInformationMessage(
+            `Forgejo Connector ${version}`,
+            { modal: true, detail: (release.body || '').trim() || 'Опису змін немає.' }
+          );
+        }
+      } while (choice === notes);
+      if (choice === skip) {
+        await this.context.globalState.update(SKIPPED_VERSION_KEY, version);
+        return;
+      }
+      if (choice !== update) {
+        return;
+      }
+    } finally {
+      this.updatePromptOpen = false;
+    }
+
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Forgejo Connector: встановлення версії ${version}…` },
+      async () => {
+        const data = await client.download(asset.browser_download_url);
+        const dir = this.context.globalStorageUri;
+        await vscode.workspace.fs.createDirectory(dir);
+        const file = vscode.Uri.joinPath(dir, asset.name);
+        await vscode.workspace.fs.writeFile(file, data);
+        await vscode.commands.executeCommand('workbench.extensions.installExtension', file);
+        await vscode.workspace.fs.delete(file).then(undefined, () => undefined);
+      }
+    );
+    const reload = 'Перезавантажити вікно';
+    if (await vscode.window.showInformationMessage(
+      `Forgejo Connector ${version} встановлено. Перезавантажте вікно, щоб застосувати оновлення.`, reload
+    ) === reload) {
+      await vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }
+  }
+
   // Як у GitHub: якщо .gitignore немає, дати зняти позначку з файлів і папок, які не потрібно комітити.
   // Повертає список імен для .gitignore ([] — комітити все) або undefined, якщо скасовано.
   async pickIgnoredEntries(folderUri) {
@@ -846,12 +986,19 @@ async function activate(context) {
     vscode.commands.registerCommand('forgejo.clone', withErrors(() => forgejo.cmdClone())),
     vscode.commands.registerCommand('forgejo.createRepository', withErrors(() => forgejo.cmdCreateRepository())),
     vscode.commands.registerCommand('forgejo.publish', withErrors(() => forgejo.cmdPublish())),
+    vscode.commands.registerCommand('forgejo.checkForUpdates', withErrors(() => forgejo.checkForUpdates(true))),
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('forgejo.url')) {
         forgejo.reset();
       }
     })
   );
+
+  // Автоматична перевірка — тихо: без діалогів входу й без повідомлень про помилки
+  const autoCheck = () => forgejo.checkForUpdates(false).catch(err => console.warn('Forgejo: перевірка оновлень:', err));
+  const firstCheck = setTimeout(autoCheck, UPDATE_FIRST_CHECK_MS);
+  const periodicCheck = setInterval(autoCheck, UPDATE_INTERVAL_MS);
+  context.subscriptions.push({ dispose: () => { clearTimeout(firstCheck); clearInterval(periodicCheck); } });
 
   if (git) {
     context.subscriptions.push(
@@ -876,5 +1023,5 @@ module.exports = {
   activate,
   deactivate,
   // для тестів
-  _internal: { ForgejoClient, errorMessage, repoUrls, sanitizeRepoName, validateRepoName, normalizeUrl },
+  _internal: { ForgejoClient, errorMessage, compareVersions, repoUrls, sanitizeRepoName, validateRepoName, normalizeUrl },
 };
