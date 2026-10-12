@@ -26,15 +26,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ env.TAG }}
       - name: Fetch annotated tag
         # actions/checkout підміняє анотований тег легким — без повідомлення
         run: git fetch --force --depth 1 origin "+refs/tags/$TAG:refs/tags/$TAG"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
       - name: Test
         run: sh test/run.sh
       - name: Build
