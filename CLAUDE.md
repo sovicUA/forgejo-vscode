@@ -11,7 +11,7 @@
 - `release.py` + `.forgejo/workflows/release.yml` — реліз за тегом `v<версія>` (мітка раннера `forgejo-vscode-ci`):
   тести → `.vsix` → реліз Forgejo; опис — повідомлення анотованого тега. Checkout і сертифікати — як у xBot.
 - `.github/workflows/release.yml` — той самий реліз на дзеркалі GitHub (тег приходить дзеркалом): тести → `.vsix` →
-  `gh release`; Forgejo каталог `.github` ігнорує, бо є `.forgejo/workflows`. Самооновлення й далі з Forgejo.
+  `gh release`; Forgejo каталог `.github` ігнорує, бо є `.forgejo/workflows`. З 0.5.0 самооновлення за замовчуванням — звідси.
 - `deploy/runner/` — стек раннера `forgejo-vscode-ci` (організація xDevOps, без Docker хоста в завданнях);
   розгортання й реєстрація — `docs/release.md`. Образ завдань — спільний `ci-docker` з xInfra (python3 + nodejs).
 - `tools/make_icons.py` — генерує `icon.png` (256×256, іконка розширення) і `media/forgejo.ttf` (шрифт з гліфом U+E001
@@ -55,9 +55,9 @@
   404 на releases/latest → перевірка `GET /repos/…`: репозиторію немає → помилка (а не «остання версія»).
 - Створення: `POST /user/repos` або `/orgs/{org}/repos` (`name`, `description`, `private`, `auto_init`, `readme`).
 
-## Стан (2026-10-04)
+## Стан (2026-10-12)
 
-- Встановлено 0.4.0 (самооновленням; іконка розширення й `$(forgejo-logo)` на кнопці — перевірено користувачем ✅). Сервер користувача: `https://git.ac.lan` (SSH: `ssh://git@git.ac.lan:2222/...`), логін `v.sytnyk`.
+- Встановлено 0.5.0 (2026-10-12: самооновлення 0.4.0→0.5.0 з Forgejo, потім ручна перевірка вже через GitHub — «остання версія» ✅). 0.4.0: іконка розширення й `$(forgejo-logo)` на кнопці — перевірено користувачем ✅). Сервер користувача: `https://git.ac.lan` (SSH: `ssh://git@git.ac.lan:2222/...`), логін `v.sytnyk`.
 - Перевірено вручну на реальному сервері: вхід; Publish to Forgejo через SSH (сам цей проєкт опубліковано в
   організацію `xDevOps/forgejo-vscode`, з повтором після збою — ensureGitIdentity + «Використати наявний порожній»).
 - Перевірено також: список репозиторіїв у Git: Clone; клон через HTTPS (xAuto/xBot) — сертифікат git приймає, пароль не питався.
