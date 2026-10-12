@@ -66,6 +66,8 @@
 - Раннер `forgejo-vscode-ci` розгорнуто й зареєстровано (2026-10-04, `engine.ac.lan-forgejo-vscode`, runner v13.2.0);
   образ ci-docker перезібрано з python3/nodejs (xInfra `aeba682`). Серверні кроки виконує користувач — агенту запис
   на сервер (`ssh engine` зі змінами) і читання `.env` заборонені правилами дозволів; оболонка сервера — zsh.
+- Дзеркало на GitHub: `sovicUA/forgejo-vscode` (push mirror з Forgejo; токену потрібне право workflow).
+  Реліз GitHub 0.4.0 зібрано вручну (`gh workflow run release.yml -f tag=v0.4.0`) ✅ 2026-10-12.
 - Сам проєкт тепер у git (`origin` → xDevOps/forgejo-vscode, гілка `main`); `.gitignore`: `/.vscode`, `*.vsix`.
 - Користувач працює і на Mac, і на Windows — розширення має працювати на обох.
 - Публікація в Marketplace не планувалась (`publisher: "local"`).
