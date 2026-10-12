@@ -2,15 +2,24 @@
 # у релізі GitHub. Теги потрапляють сюди через дзеркало, тож окремих дій при випуску не потрібно —
 # той самий тег, що й для Forgejo (.forgejo/workflows/release.yml; Forgejo цей каталог ігнорує).
 # Опис релізу — повідомлення анотованого тега, як у release.py.
+# Вручну (Actions → Release → Run workflow) — для наявного тега, напр. старішого за цей файл.
 name: Release
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Тег, напр. v0.4.0'
+        required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -18,9 +27,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
       - name: Fetch annotated tag
         # actions/checkout підміняє анотований тег легким — без повідомлення
-        run: git fetch --force --depth 1 origin "+${GITHUB_REF}:${GITHUB_REF}"
+        run: git fetch --force --depth 1 origin "+refs/tags/$TAG:refs/tags/$TAG"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -30,8 +41,8 @@ jobs:
         id: build
         run: |
           VERSION=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
-          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
-            echo "::error::Тег $GITHUB_REF_NAME не відповідає версії в package.json ($VERSION)"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Тег $TAG не відповідає версії в package.json ($VERSION)"
             exit 1
           fi
           echo "vsix=$(python3 build_vsix.py)" >> "$GITHUB_OUTPUT"
@@ -43,10 +54,10 @@ jobs:
           TITLE: ${{ steps.build.outputs.title }}
         run: |
           # Підпис GPG/SSH, якщо тег підписаний, — не частина опису
-          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/^-----BEGIN /,$d' > notes.md
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+          git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN /,$d' > notes.md
+          if gh release view "$TAG" > /dev/null 2>&1; then
             # Повторний запуск для того самого тега замінює .vsix
-            gh release upload "$GITHUB_REF_NAME" "$VSIX" --clobber
+            gh release upload "$TAG" "$VSIX" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$VSIX" --title "$TITLE" --notes-file notes.md --verify-tag
+            gh release create "$TAG" "$VSIX" --title "$TITLE" --notes-file notes.md --verify-tag
           fi
