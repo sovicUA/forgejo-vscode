@@ -106,9 +106,12 @@ function describeNetworkError(err) {
   }
 }
 
+// Без token — анонімні запити (публічний репозиторій). apiUrl — інша адреса API: для релізів GitHub
+// (api.github.com) шляхи /repos/{власник}/{назва}/releases/latest і /repos/{власник}/{назва} ті самі, що й у Forgejo.
 class ForgejoClient {
-  constructor(baseUrl, token) {
+  constructor(baseUrl, token, apiUrl = `${baseUrl}/api/v1`) {
     this.baseUrl = baseUrl;
+    this.apiUrl = apiUrl;
     this.token = token;
     this.user = undefined;
   }
@@ -117,13 +120,17 @@ class ForgejoClient {
     return new Promise((resolve, reject) => {
       let url;
       try {
-        url = new URL(`${this.baseUrl}/api/v1${apiPath}`);
+        url = new URL(`${this.apiUrl}${apiPath}`);
       } catch {
         reject(new ForgejoError(`Некоректна адреса сервера: ${this.baseUrl}`));
         return;
       }
       const data = body === undefined ? undefined : Buffer.from(JSON.stringify(body), 'utf8');
-      const headers = { Accept: 'application/json', Authorization: `token ${this.token}` };
+      // User-Agent обов'язковий для API GitHub
+      const headers = { Accept: 'application/json', 'User-Agent': 'forgejo-connector' };
+      if (this.token) {
+        headers.Authorization = `token ${this.token}`;
+      }
       if (data) {
         headers['Content-Type'] = 'application/json';
         headers['Content-Length'] = data.length;
@@ -195,16 +202,27 @@ class ForgejoClient {
     return (res && res.data) || [];
   }
 
-  // Останній опублікований реліз (без чернеток і пре-релізів); undefined, якщо релізів немає
-  getLatestRelease(fullName) {
+  // Останній опублікований реліз (без чернеток і пре-релізів); undefined, якщо релізів немає.
+  // 404 буває і без релізів, і без самого репозиторію — тоді помилка, а не «оновлень немає».
+  async getLatestRelease(fullName) {
     const [owner, name] = fullName.split('/');
-    return this.request('GET', `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/releases/latest`)
-      .catch(err => {
-        if (err.status === 404) {
-          return undefined;
-        }
+    try {
+      return await this.request('GET', `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/releases/latest`);
+    } catch (err) {
+      if (err.status !== 404) {
         throw err;
-      });
+      }
+    }
+    try {
+      await this.getRepo(owner, name);
+    } catch (err) {
+      if (err.status === 404) {
+        throw new ForgejoError(`репозиторій оновлень ${fullName} не знайдено на ${this.baseUrl} `
+          + '(налаштування forgejo.updates.repository)', 404);
+      }
+      throw err;
+    }
+    return undefined;
   }
 
   // Файл релізу (/releases/download/…) — не API, тож Basic-автентифікація логін + токен, як у git.
@@ -212,8 +230,8 @@ class ForgejoClient {
   download(fileUrl, redirects = 5) {
     return new Promise((resolve, reject) => {
       const url = new URL(fileUrl);
-      const headers = {};
-      if (url.origin === new URL(this.baseUrl).origin) {
+      const headers = { 'User-Agent': 'forgejo-connector' };
+      if (this.token && this.user && url.origin === new URL(this.baseUrl).origin) {
         headers.Authorization = 'Basic ' + Buffer.from(`${this.user.login}:${this.token}`).toString('base64');
       }
       const lib = url.protocol === 'http:' ? http : https;
@@ -246,6 +264,39 @@ class ForgejoClient {
     const apiPath = org ? `/orgs/${encodeURIComponent(org)}/repos` : '/user/repos';
     return this.request('POST', apiPath, body);
   }
+}
+
+// Джерело оновлень з forgejo.updates.repository; undefined — некоректне значення:
+//   «власник/назва» — репозиторій на сервері forgejo.url, з токеном входу ({ repo, signedIn });
+//   https://github.com/власник/назва — релізи GitHub, публічний API без входу;
+//   https://сервер[/підшлях]/власник/назва — інший сервер Forgejo/Gitea, публічний репозиторій без входу
+//   (якщо це сервер forgejo.url — як «власник/назва»).
+function parseUpdateSource(value, forgejoUrl) {
+  value = (value || '').trim();
+  if (!/^https?:\/\//i.test(value)) {
+    return /^[^/\s]+\/[^/\s]+$/.test(value) ? { repo: value, signedIn: true } : undefined;
+  }
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const parts = url.pathname.replace(/\.git\/?$/i, '').split('/').filter(Boolean);
+  if (/^(www\.)?github\.com$/i.test(url.hostname)) {
+    return parts.length >= 2
+      ? { repo: `${parts[0]}/${parts[1]}`, baseUrl: 'https://github.com', apiUrl: 'https://api.github.com' }
+      : undefined;
+  }
+  if (parts.length < 2) {
+    return undefined;
+  }
+  const repo = parts.slice(-2).join('/');
+  const baseUrl = normalizeUrl(url.origin + '/' + parts.slice(0, -2).join('/'));
+  if (baseUrl.toLowerCase() === normalizeUrl(forgejoUrl).toLowerCase()) {
+    return { repo, signedIn: true };
+  }
+  return { repo, baseUrl };
 }
 
 // Порівняння версій вигляду 1.2.3 (необов'язковий префікс «v»): > 0, якщо a новіша за b
@@ -840,23 +891,29 @@ class Forgejo {
     await this.publishFolder(existing ? existing.rootUri : folder.uri, existing || undefined);
   }
 
-  // --- Оновлення розширення з релізів Forgejo (forgejo.updates.repository) ---
+  // --- Оновлення розширення з релізів Forgejo або GitHub (forgejo.updates.repository, див. parseUpdateSource) ---
 
   // interactive = true: команда «Перевірити оновлення» — з діалогами входу й повідомленням «остання версія»
   async checkForUpdates(interactive) {
-    const repoName = (config().get('updates.repository') || '').trim();
-    if (!repoName || (!interactive && !config().get('updates.check'))) {
+    if (!interactive && !config().get('updates.check')) {
+      return;
+    }
+    const source = parseUpdateSource(config().get('updates.repository'), this.baseUrl);
+    if (!source) {
       if (interactive) {
-        vscode.window.showWarningMessage('Forgejo: не вказано репозиторій оновлень (налаштування forgejo.updates.repository).');
+        vscode.window.showWarningMessage('Forgejo: не вказано або некоректний репозиторій оновлень '
+          + '(налаштування forgejo.updates.repository: власник/назва або https://github.com/власник/назва).');
       }
       return;
     }
-    const client = await this.getClient(interactive);
+    const client = source.signedIn
+      ? await this.getClient(interactive)
+      : new ForgejoClient(source.baseUrl, undefined, source.apiUrl);
     if (!client) {
       return;
     }
     const current = this.context.extension.packageJSON.version;
-    const release = await client.getLatestRelease(repoName);
+    const release = await client.getLatestRelease(source.repo);
     const asset = release && (release.assets || []).find(a => /\.vsix$/i.test(a.name));
     if (!release || !asset || compareVersions(release.tag_name, current) <= 0) {
       if (interactive) {
@@ -1034,5 +1091,5 @@ module.exports = {
   activate,
   deactivate,
   // для тестів
-  _internal: { ForgejoClient, errorMessage, compareVersions, repoUrls, sanitizeRepoName, validateRepoName, normalizeUrl },
+  _internal: { ForgejoClient, parseUpdateSource, errorMessage, compareVersions, repoUrls, sanitizeRepoName, validateRepoName, normalizeUrl },
 };

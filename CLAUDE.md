@@ -49,6 +49,10 @@
   `workbench.extensions.installExtension` з `Uri.file` (**лише file:** — `globalStorageUri` у VS Code 1.140 має схему
   `vscode-userdata:`, і встановлення падає з «No Servers»; на цьому спіткнулась 0.3.0),
   потім пропозиція `reloadWindow`. Авто — через 15 с і кожні 6 год, тихо (`getClient(false)`); «Пропустити» → globalState.
+  Джерело — `parseUpdateSource`: `власник/назва` → сервер `forgejo.url` з токеном; повна адреса → анонімний
+  `ForgejoClient` (для github.com `apiUrl` = api.github.com — шляхи релізів ті самі; потрібен User-Agent).
+  За замовчуванням — GitHub (`sovicUA/forgejo-vscode`), щоб оновлювались і користувачі поза мережею.
+  404 на releases/latest → перевірка `GET /repos/…`: репозиторію немає → помилка (а не «остання версія»).
 - Створення: `POST /user/repos` або `/orgs/{org}/repos` (`name`, `description`, `private`, `auto_init`, `readme`).
 
 ## Стан (2026-10-04)

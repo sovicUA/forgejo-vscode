@@ -13,6 +13,7 @@ const srv = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'); const page = +u.searchParams.get('page') || 1, limit = +u.searchParams.get('limit');
   const pg = arr => arr.slice((page-1)*Math.min(limit,30), page*Math.min(limit,30)); // сервер з межею 30
   const send = (code, obj) => { res.writeHead(code, {'Content-Type':'application/json'}); res.end(JSON.stringify(obj)); };
+  if (u.pathname === '/sub/api/v1/repos/pub/fc/releases/latest' && !auth && req.headers['user-agent']) return send(200, { tag_name: 'v0.5.0', assets: [] });
   if (auth !== 'token good') return send(401, { message: 'unauthorized' });
   if (u.pathname === '/sub/api/v1/user') return send(200, { login: 'viktor' });
   if (u.pathname === '/sub/api/v1/user/repos' && req.method === 'GET') return send(200, pg(mine));
@@ -20,6 +21,7 @@ const srv = http.createServer((req, res) => {
   if (u.pathname === '/sub/api/v1/orgs/team/repos' && req.method === 'GET') return send(200, pg([mk(5, 'me/r5'), mk(500, 'team/shared')]));
   if (u.pathname === '/sub/api/v1/repos/xDevOps/fc/releases/latest') return send(200, { tag_name: 'v0.3.1', assets: [{ name: 'a.vsix', browser_download_url: base + '/xDevOps/fc/releases/download/v0.3.1/a.vsix' }] });
   if (u.pathname === '/sub/api/v1/repos/xDevOps/none/releases/latest') return send(404, { message: 'not found' });
+  if (u.pathname === '/sub/api/v1/repos/xDevOps/norel') return send(200, mk(78, 'xDevOps/norel'));
   if (u.pathname === '/sub/api/v1/repos/viktor/dup') return send(200, mk(77, 'viktor/dup', { empty: true }));
   if (u.pathname === '/sub/api/v1/repos/search') return send(200, { ok: true, data: [mk(900, 'other/' + u.searchParams.get('q'))] });
   if (req.method === 'POST') { let b=''; req.on('data', c => b += c); req.on('end', () => { lastPost = { path: u.pathname, body: JSON.parse(b) }; if (lastPost.body.name === 'dup') return send(409, { message: 'exists' }); send(201, mk(1000, 'x/' + lastPost.body.name, { empty: true })); }); return; }
@@ -58,12 +60,23 @@ srv.listen(0, async () => {
   c.user = { login: 'viktor' };
   const rel = await c.getLatestRelease('xDevOps/fc');
   assert.strictEqual(rel.tag_name, 'v0.3.1');
-  assert.strictEqual(await c.getLatestRelease('xDevOps/none'), undefined);
+  assert.strictEqual(await c.getLatestRelease('xDevOps/norel'), undefined, 'репозиторій без релізів');
+  await assert.rejects(c.getLatestRelease('xDevOps/none'), e => e.status === 404 && /xDevOps\/none не знайдено/.test(e.message));
+  assert.strictEqual((await new I.ForgejoClient(base, undefined).getLatestRelease('pub/fc')).tag_name, 'v0.5.0', 'анонімно');
   assert.deepStrictEqual([...await c.download(rel.assets[0].browser_download_url)], [80, 75, 3, 4]);
   assert.deepStrictEqual([...await c.download(base + '/redirect.vsix')], [80, 75, 3, 4], 'redirect');
   const bad = new I.ForgejoClient(base, 'bad'); bad.user = { login: 'viktor' };
   await assert.rejects(bad.download(rel.assets[0].browser_download_url), e => e.status === 404);
   assert.ok(I.compareVersions('v0.3.1', '0.3.0') > 0); assert.ok(I.compareVersions('0.10.0', '0.9.9') > 0);
   assert.strictEqual(I.compareVersions('v1.0.0', '1.0'), 0); assert.ok(I.compareVersions('0.2.2', '0.3.0') < 0);
+  const P = I.parseUpdateSource, fu = 'https://git.ac.lan/';
+  assert.deepStrictEqual(P(' xDevOps/forgejo-vscode ', fu), { repo: 'xDevOps/forgejo-vscode', signedIn: true });
+  assert.deepStrictEqual(P('https://github.com/sovicUA/forgejo-vscode.git', fu),
+    { repo: 'sovicUA/forgejo-vscode', baseUrl: 'https://github.com', apiUrl: 'https://api.github.com' });
+  assert.strictEqual(P('https://github.com/sovicUA/forgejo-vscode/releases', fu).repo, 'sovicUA/forgejo-vscode');
+  assert.deepStrictEqual(P('https://git.ac.lan/xDevOps/forgejo-vscode', fu), { repo: 'xDevOps/forgejo-vscode', signedIn: true });
+  assert.deepStrictEqual(P('https://codeberg.org/a/b/', fu), { repo: 'a/b', baseUrl: 'https://codeberg.org' });
+  assert.deepStrictEqual(P('https://h.ua/git/a/b', fu), { repo: 'a/b', baseUrl: 'https://h.ua/git' });
+  for (const v of ['', 'abc', 'a/b/c', 'https://github.com/a', 'https://h.ua/a']) assert.strictEqual(P(v, fu), undefined, v);
   console.log('ALL TESTS PASSED'); srv.close();
 });
