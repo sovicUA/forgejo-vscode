@@ -1,0 +1,52 @@
+# Реліз на GitHub (дзеркало xDevOps/forgejo-vscode): push тега v<версія> → тести → forgejo-connector-<версія>.vsix
+# у релізі GitHub. Теги потрапляють сюди через дзеркало, тож окремих дій при випуску не потрібно —
+# той самий тег, що й для Forgejo (.forgejo/workflows/release.yml; Forgejo цей каталог ігнорує).
+# Опис релізу — повідомлення анотованого тега, як у release.py.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Fetch annotated tag
+        # actions/checkout підміняє анотований тег легким — без повідомлення
+        run: git fetch --force --depth 1 origin "+${GITHUB_REF}:${GITHUB_REF}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Test
+        run: sh test/run.sh
+      - name: Build
+        id: build
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Тег $GITHUB_REF_NAME не відповідає версії в package.json ($VERSION)"
+            exit 1
+          fi
+          echo "vsix=$(python3 build_vsix.py)" >> "$GITHUB_OUTPUT"
+          echo "title=$(python3 -c "import json; p=json.load(open('package.json')); print(p['displayName'], p['version'])")" >> "$GITHUB_OUTPUT"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VSIX: ${{ steps.build.outputs.vsix }}
+          TITLE: ${{ steps.build.outputs.title }}
+        run: |
+          # Підпис GPG/SSH, якщо тег підписаний, — не частина опису
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/^-----BEGIN /,$d' > notes.md
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            # Повторний запуск для того самого тега замінює .vsix
+            gh release upload "$GITHUB_REF_NAME" "$VSIX" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$VSIX" --title "$TITLE" --notes-file notes.md --verify-tag
+          fi

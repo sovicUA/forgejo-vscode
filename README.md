@@ -64,6 +64,8 @@
    ```
 3. Forgejo Actions (`.forgejo/workflows/release.yml`, раннер з міткою `forgejo-vscode-ci`, `deploy/runner`, [docs/release.md](docs/release.md)) проганяє тести, збирає `.vsix`
    і створює реліз (`release.py`). Тег має збігатися з версією в `package.json`, інакше реліз не створюється.
+4. Тег через дзеркало потрапляє на GitHub, де GitHub Actions (`.github/workflows/release.yml`) так само
+   проганяє тести й створює реліз з тим самим `.vsix` і описом.
 
 ## Сервер із внутрішнім сертифікатом
 

@@ -10,6 +10,8 @@
   `forgejo.url`, `forgejo.cloneProtocol` (`ssh`|`https`|`ask`, за замовчуванням `ssh`), `forgejo.defaultPrivate`.
 - `release.py` + `.forgejo/workflows/release.yml` — реліз за тегом `v<версія>` (мітка раннера `forgejo-vscode-ci`):
   тести → `.vsix` → реліз Forgejo; опис — повідомлення анотованого тега. Checkout і сертифікати — як у xBot.
+- `.github/workflows/release.yml` — той самий реліз на дзеркалі GitHub (тег приходить дзеркалом): тести → `.vsix` →
+  `gh release`; Forgejo каталог `.github` ігнорує, бо є `.forgejo/workflows`. Самооновлення й далі з Forgejo.
 - `deploy/runner/` — стек раннера `forgejo-vscode-ci` (організація xDevOps, без Docker хоста в завданнях);
   розгортання й реєстрація — `docs/release.md`. Образ завдань — спільний `ci-docker` з xInfra (python3 + nodejs).
 - `tools/make_icons.py` — генерує `icon.png` (256×256, іконка розширення) і `media/forgejo.ttf` (шрифт з гліфом U+E001
